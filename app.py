@@ -1,27 +1,69 @@
+import time
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-from database import init_db, create_user, login_user, insert_survey_data, fetch_survey_data
+from database import (init_db, create_user, login_user, insert_survey_data, fetch_survey_data,
+                      insert_learning_history, update_waiting_time, fetch_menu_order, fetch_learning_history)
 
 # DB 초기화 및 테이블 생성
 init_db()
 
 st.set_page_config(page_title="AI 교육 앱", layout="wide")
 
-# menu = ["Home", "Login", "SignUp", "설문참여",]
-menu = ["Home", "Login", "SignUp", "설문참여", "pythonid", "블록리게임", "테트리스게임"]
-choice = st.sidebar.selectbox("Menu", menu)
-
-# 세션 상태 초기화 (로그인 관리)
+# 세션 상태 초기화 (로그인 관리 + 학습 이력 관리)
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
     st.session_state['user_id'] = ''
+if 'current_menu' not in st.session_state:
+    st.session_state['current_menu'] = None   # 현재 머무르고 있는 메뉴
+    st.session_state['history_id'] = None     # learning_history 테이블의 현재 행 id
+    st.session_state['menu_start'] = None     # 현재 메뉴에 들어온 시각
+    st.session_state['menu_order'] = None     # 로그인 시 정렬된 메뉴 순서
+
+def close_current_menu():
+    '''현재 메뉴의 체류 시간(초)을 learning_history에 저장'''
+    if st.session_state['history_id'] is not None:
+        waiting_time = int(time.time() - st.session_state['menu_start'])
+        update_waiting_time(st.session_state['history_id'], waiting_time)
+    st.session_state['current_menu'] = None
+    st.session_state['history_id'] = None
+    st.session_state['menu_start'] = None
+
+# 학습 메뉴 (로그인 시 학습 이력에 따라 순서가 재배치됨)
+content_menu = ["설문참여", "pythonid", "블록리게임", "테트리스게임"]
+
+# menu = ["Home", "Login", "SignUp", "설문참여", "pythonid", "블록리게임", "테트리스게임"]
+if st.session_state['logged_in']:
+    menu = ["Home"] + st.session_state['menu_order']
+else:
+    menu = ["Home", "Login", "SignUp"] + content_menu
+choice = st.sidebar.selectbox("Menu", menu)
+
+# 로그오프: 현재 메뉴 체류 시간 저장 후 로그아웃
+if st.session_state['logged_in']:
+    st.sidebar.write(f"👤 {st.session_state['user_id']}")
+    if st.sidebar.button("Logoff"):
+        close_current_menu()
+        st.session_state['logged_in'] = False
+        st.session_state['user_id'] = ''
+        st.session_state['menu_order'] = None
+        st.rerun()
+
+# 메뉴 클릭 기록: 메뉴가 바뀌면 이전 메뉴 체류 시간 저장 + 새 메뉴 클릭 기록
+if st.session_state['logged_in'] and choice != st.session_state['current_menu']:
+    close_current_menu()
+    st.session_state['history_id'] = insert_learning_history(st.session_state['user_id'], choice)
+    st.session_state['current_menu'] = choice
+    st.session_state['menu_start'] = time.time()
 
 if choice == "Home":
     st.title("홈 화면")
     st.write("환영합니다. AI 교육적 효과 인식 설문 앱입니다.")
     if st.session_state['logged_in']:
         st.success(f"{st.session_state['user_id']}님, 로그인 상태입니다.")
+        st.subheader("📚 나의 학습 이력")
+        st.caption("메뉴 순서는 로그인할 때 총 체류 시간이 많은 순으로 재배치됩니다.")
+        st.dataframe(fetch_learning_history(st.session_state['user_id']), width="stretch")
 
 elif choice == "SignUp":
     st.title("회원가입")
@@ -50,7 +92,9 @@ elif choice == "Login":
             if result:
                 st.session_state['logged_in'] = True
                 st.session_state['user_id'] = userid
-                st.success(f"{userid}님 환영합니다.")
+                # 학습 이력(learning_history)을 참조하여 메뉴 순서 재배치
+                st.session_state['menu_order'] = fetch_menu_order(userid, content_menu)
+                st.rerun()
             else:
                 st.error("ID 또는 비밀번호가 틀렸습니다.")
 

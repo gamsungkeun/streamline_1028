@@ -21,3 +21,12 @@ CREATE TABLE "survey_table" (
 	"created_at"	TEXT,
 	PRIMARY KEY("id_num" AUTOINCREMENT)
 );
+
+CREATE TABLE "learning_history" (
+	"id_num"	INTEGER NOT NULL,
+	"user_id"	TEXT NOT NULL,
+	"menu_id"	TEXT NOT NULL,
+	"waiting_time"	INTEGER DEFAULT 0,
+	"created_at"	TEXT,
+	PRIMARY KEY("id_num" AUTOINCREMENT)
+);
