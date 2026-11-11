@@ -4,7 +4,7 @@
 이름 :
 
 [배포 주소]
-- GitHub Repository : https://github.com/<GitHub아이디>/<저장소이름>
+- GitHub Repository : https://github.com/gamsungkeun/streamline_1028
 - Streamlit 앱 주소  : https://<앱이름>.streamlit.app
 
 [추가한 메뉴]
