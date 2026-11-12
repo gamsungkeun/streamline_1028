@@ -32,21 +32,45 @@ def close_current_menu():
 # 학습 메뉴 (로그인 시 학습 이력에 따라 순서가 재배치됨)
 content_menu = ["설문참여", "pythonid", "블록리게임", "테트리스게임"]
 
+# 기본 메뉴 (로그인 후 학습 메뉴와 분리되어 표시됨)
+account_menu = ["Home", "Login", "SignUp"]
+
+# 로그인/로그오프 직후: 메뉴 선택을 Home으로 초기화 (위젯 생성 전에 처리)
+if st.session_state.get('reset_menu'):
+    st.session_state['account_choice'] = "Home"
+    st.session_state['study_choice'] = None
+    st.session_state['reset_menu'] = False
+
+def select_account_menu():
+    '''기본 메뉴를 선택하면 학습 메뉴 선택은 해제'''
+    if st.session_state['account_choice'] is not None:
+        st.session_state['study_choice'] = None
+
+def select_study_menu():
+    '''학습 메뉴를 선택하면 기본 메뉴 선택은 해제'''
+    if st.session_state['study_choice'] is not None:
+        st.session_state['account_choice'] = None
+
 # menu = ["Home", "Login", "SignUp", "설문참여", "pythonid", "블록리게임", "테트리스게임"]
 if st.session_state['logged_in']:
-    menu = ["Home"] + st.session_state['menu_order']
+    # 로그인 시: 메뉴바 2개로 분리 (① 기본 메뉴, ② 학습 메뉴 - 학습 이력 순으로 재배치)
+    st.sidebar.write(f"👤 {st.session_state['user_id']}")
+    st.sidebar.selectbox("🏠 기본 메뉴", account_menu, index=None, placeholder="기본 메뉴 선택",
+                         key="account_choice", on_change=select_account_menu)
+    st.sidebar.selectbox("📚 학습 메뉴", st.session_state['menu_order'], index=None, placeholder="학습 메뉴 선택",
+                         key="study_choice", on_change=select_study_menu)
+    choice = st.session_state['account_choice'] or st.session_state['study_choice'] or "Home"
 else:
-    menu = ["Home", "Login", "SignUp"] + content_menu
-choice = st.sidebar.selectbox("Menu", menu)
+    choice = st.sidebar.selectbox("Menu", account_menu + content_menu)
 
 # 로그오프: 현재 메뉴 체류 시간 저장 후 로그아웃
 if st.session_state['logged_in']:
-    st.sidebar.write(f"👤 {st.session_state['user_id']}")
     if st.sidebar.button("Logoff"):
         close_current_menu()
         st.session_state['logged_in'] = False
         st.session_state['user_id'] = ''
         st.session_state['menu_order'] = None
+        st.session_state['reset_menu'] = True
         st.rerun()
 
 # 메뉴 클릭 기록: 메뉴가 바뀌면 이전 메뉴 체류 시간 저장 + 새 메뉴 클릭 기록
@@ -94,6 +118,7 @@ elif choice == "Login":
                 st.session_state['user_id'] = userid
                 # 학습 이력(learning_history)을 참조하여 메뉴 순서 재배치
                 st.session_state['menu_order'] = fetch_menu_order(userid, content_menu)
+                st.session_state['reset_menu'] = True
                 st.rerun()
             else:
                 st.error("ID 또는 비밀번호가 틀렸습니다.")
