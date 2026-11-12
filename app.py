@@ -18,7 +18,8 @@ if 'current_menu' not in st.session_state:
     st.session_state['current_menu'] = None   # 현재 머무르고 있는 메뉴
     st.session_state['history_id'] = None     # learning_history 테이블의 현재 행 id
     st.session_state['menu_start'] = None     # 현재 메뉴에 들어온 시각
-    st.session_state['menu_order'] = None     # 로그인 시 정렬된 메뉴 순서
+    st.session_state['menu_order'] = None     # 로그인 시 정렬된 학습 메뉴 순서
+    st.session_state['account_order'] = None  # 로그인 시 정렬된 기본 메뉴 순서
 
 def close_current_menu():
     '''현재 메뉴의 체류 시간(초)을 learning_history에 저장'''
@@ -32,12 +33,13 @@ def close_current_menu():
 # 학습 메뉴 (로그인 시 학습 이력에 따라 순서가 재배치됨)
 content_menu = ["설문참여", "pythonid", "블록리게임", "테트리스게임"]
 
-# 기본 메뉴 (로그인 후 학습 메뉴와 분리되어 표시됨)
+# 기본 메뉴 (로그인 후 Home 없이 학습 메뉴와 분리되어 표시됨)
 account_menu = ["Home", "Login", "SignUp"]
+login_menu = ["Login", "SignUp"]
 
-# 로그인/로그오프 직후: 메뉴 선택을 Home으로 초기화 (위젯 생성 전에 처리)
+# 로그인/로그오프 직후: 메뉴 선택 초기화 → 홈 화면 표시 (위젯 생성 전에 처리)
 if st.session_state.get('reset_menu'):
-    st.session_state['account_choice'] = "Home"
+    st.session_state['account_choice'] = None
     st.session_state['study_choice'] = None
     st.session_state['reset_menu'] = False
 
@@ -53,12 +55,12 @@ def select_study_menu():
 
 # menu = ["Home", "Login", "SignUp", "설문참여", "pythonid", "블록리게임", "테트리스게임"]
 if st.session_state['logged_in']:
-    # 로그인 시: 메뉴바 2개로 분리 (① 기본 메뉴, ② 학습 메뉴 - 학습 이력 순으로 재배치)
+    # 로그인 시: 펼쳐진 메뉴 2개로 분리 (① 기본 메뉴, ② 학습 메뉴 - 각각 waiting_time 오래 머문 순으로 정렬)
     st.sidebar.write(f"👤 {st.session_state['user_id']}")
-    st.sidebar.selectbox("🏠 기본 메뉴", account_menu, index=None, placeholder="기본 메뉴 선택",
-                         key="account_choice", on_change=select_account_menu)
-    st.sidebar.selectbox("📚 학습 메뉴", st.session_state['menu_order'], index=None, placeholder="학습 메뉴 선택",
-                         key="study_choice", on_change=select_study_menu)
+    st.sidebar.radio("🏠 기본 메뉴", st.session_state.get('account_order') or login_menu, index=None,
+                     key="account_choice", on_change=select_account_menu)
+    st.sidebar.radio("📚 학습 메뉴", st.session_state['menu_order'], index=None,
+                     key="study_choice", on_change=select_study_menu)
     choice = st.session_state['account_choice'] or st.session_state['study_choice'] or "Home"
 else:
     choice = st.sidebar.selectbox("Menu", account_menu + content_menu)
@@ -70,6 +72,7 @@ if st.session_state['logged_in']:
         st.session_state['logged_in'] = False
         st.session_state['user_id'] = ''
         st.session_state['menu_order'] = None
+        st.session_state['account_order'] = None
         st.session_state['reset_menu'] = True
         st.rerun()
 
@@ -86,7 +89,7 @@ if choice == "Home":
     if st.session_state['logged_in']:
         st.success(f"{st.session_state['user_id']}님, 로그인 상태입니다.")
         st.subheader("📚 나의 학습 이력")
-        st.caption("메뉴 순서는 로그인할 때 총 체류 시간이 많은 순으로 재배치됩니다.")
+        st.caption("기본 메뉴와 학습 메뉴는 로그인할 때 총 체류 시간(waiting_time)이 많은 순으로 정렬됩니다.")
         st.dataframe(fetch_learning_history(st.session_state['user_id']), width="stretch")
 
 elif choice == "SignUp":
@@ -118,6 +121,7 @@ elif choice == "Login":
                 st.session_state['user_id'] = userid
                 # 학습 이력(learning_history)을 참조하여 메뉴 순서 재배치
                 st.session_state['menu_order'] = fetch_menu_order(userid, content_menu)
+                st.session_state['account_order'] = fetch_menu_order(userid, login_menu)
                 st.session_state['reset_menu'] = True
                 st.rerun()
             else:
